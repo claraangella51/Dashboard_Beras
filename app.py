@@ -15,8 +15,8 @@ st.title("🗺️ Heatmap Gap Supply–Demand Pangan Indonesia")
 # =============================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/gap_per_provinsi.csv")
-    gdf = gpd.read_file("data/indonesia_provincies.geojson")
+    df = pd.read_csv("gap_per_provinsi.csv")
+    gdf = gpd.read_file("indonesia.geojson")
     return df, gdf
 
 df, gdf = load_data()

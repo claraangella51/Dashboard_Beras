@@ -100,7 +100,7 @@ st.title("Analisis Produksi vs Luas Lahan & Produktivitas")
 # -------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("Produksi.csv")  
+    df = pd.read_csv("produksi_long.csv")  
     df["Luas_Ha"] = df["Luas_Ha"].astype(float)
     df["Produktivitas"] = df["Produktivitas"].astype(float)
     df["Produksi"] = df["Produksi"].astype(float)

@@ -8,7 +8,7 @@ from streamlit_folium import st_folium
 # CONFIG
 # =============================
 st.set_page_config(layout="wide")
-st.title("🗺️ Heatmap Gap Supply–Demand Pangan Indonesia")
+st.title("🗺️ Heatmap Gap Supply–Demand Beras Indonesia")
 
 # =============================
 # LOAD DATA

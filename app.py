@@ -107,6 +107,41 @@ def load_data():
     return df
 
 df_long = load_data()
+import pandas as pd
+import streamlit as st
+import os
+
+def load_data():
+    BASE_DIR = os.path.dirname(__file__)
+    csv_path = os.path.join(BASE_DIR, "produksi_long.csv")
+
+    # --- Baca CSV dengan pengecekan file ---
+    try:
+        df = pd.read_csv(csv_path)
+    except FileNotFoundError:
+        st.error(f"File not found: {csv_path}")
+        st.stop()
+
+    # --- Normalisasi kolom supaya aman dari KeyError ---
+    df.columns = df.columns.str.strip()         # hapus spasi di depan/akhir
+    df.columns = df.columns.str.replace(" ", "_")  # ganti spasi dengan underscore
+    df.columns = df.columns.str.lower()         # ubah semua jadi lowercase
+
+    st.write("Columns after normalization:", df.columns.tolist())  # optional: cek kolom
+
+    # --- Sekarang aman mengakses kolom ---
+    # contoh: ubah kolom luas_ha jadi float
+    if 'luas_ha' in df.columns:
+        df['luas_ha'] = df['luas_ha'].astype(float)
+    else:
+        st.error("'luas_ha' column not found in CSV")
+        st.stop()
+
+    return df
+
+# Panggil load_data() di main app
+df_long = load_data()
+
 
 # -------------------------------
 # 2️⃣ Prediksi Produksi (Linear Regression)

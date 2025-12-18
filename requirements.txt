@@ -12,3 +12,10 @@ branca>=0.6
 streamlit-folium>=0.18
 
 matplotlib>=3.7
+
+streamlit
+pandas
+numpy
+plotly
+scikit-learn
+

@@ -5,6 +5,35 @@ from streamlit_folium import st_folium
 import pandas as pd
 import geopandas as gpd
 
+# --- Load your data ---
+try:
+    data = pd.read_csv("data_nasional.csv")
+except FileNotFoundError:
+    st.error("File not found. Make sure 'data_nasional.csv' is in the same folder as app.py.")
+    st.stop()
+
+# --- Debug DataFrame columns ---
+st.write("Columns in your dataset:", list(data.columns))
+
+# --- Optional: Wrap session_state access ---
+def safe_get(key, default=None):
+    if key not in st.session_state:
+        st.warning(f"'{key}' not found in session_state, using default={default}")
+        st.session_state[key] = default
+    return st.session_state[key]
+
+# Example usage:
+tahun = safe_get('tahun', 2025)
+
+# --- Rest of your Streamlit code ---
+try:
+    # Access your columns safely
+    total_produksi = data['produksi_ton'].sum()
+except KeyError as e:
+    st.error(f"Column {e} not found in your DataFrame. Check spelling!")
+    st.stop()
+
+
 st.set_page_config(layout="wide")
 st.title("Peta Gap Supply–Demand per Provinsi")
 

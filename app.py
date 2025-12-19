@@ -93,4 +93,95 @@ def load_produksi(csv_file="Produksi.csv"):
 
     st.write("Kolom setelah normalisasi:", df.columns.tolist())
 
-    if "provi
+    if "provinsi" not in df.columns:
+        st.error("Kolom 'provinsi' tidak ditemukan")
+        st.stop()
+
+    # Melt wide → long menggunakan stub + nomor suffix
+    df_long = pd.wide_to_long(
+        df,
+        stubnames=["luas_panen_ha","produktivitaskuha","produksi_ton"],
+        i="provinsi",
+        j="num",          # gunakan num untuk suffix 1,2,3...
+        sep="",
+        suffix=r"\d+"
+    ).reset_index()
+
+    # ubah num jadi tahun
+    df_long["tahun"] = df_long["num"] + 2017  # suffix 1 = 2018
+    df_long.drop(columns="num", inplace=True)
+
+    # Pastikan numeric
+    df_long["luas_panen_ha"] = pd.to_numeric(df_long["luas_panen_ha"], errors="coerce")
+    df_long["produktivitaskuha"] = pd.to_numeric(df_long["produktivitaskuha"], errors="coerce")
+    df_long["produksi_ton"] = pd.to_numeric(df_long["produksi_ton"], errors="coerce")
+    df_long["tahun"] = pd.to_numeric(df_long["tahun"], errors="coerce")
+
+    return df_long
+
+df_long = load_produksi()
+
+# =============================
+# LINEAR REGRESSION
+# =============================
+X = df_long[["luas_panen_ha","produktivitaskuha"]]
+y = df_long["produksi_ton"]
+model = LinearRegression()
+model.fit(X, y)
+
+df_long["produksi_prediksi"] = model.predict(X)
+df_long["selisih"] = df_long["produksi_ton"] - df_long["produksi_prediksi"]
+df_long["status"] = np.where(df_long["selisih"]<0,"Rendah dari Prediksi","Sesuai/Diatas Prediksi")
+
+# =============================
+# SIDEBAR: Tahun & Provinsi
+# =============================
+st.sidebar.subheader("Filter Data Produksi")
+tahun_sel = st.sidebar.slider(
+    "Pilih Tahun",
+    min_value=int(df_long["tahun"].min()),
+    max_value=int(df_long["tahun"].max()),
+    value=int(df_long["tahun"].min())
+)
+
+provinsi_list = df_long["provinsi"].unique().tolist()
+selected_provinsi = st.sidebar.multiselect(
+    "Pilih Provinsi",
+    options=provinsi_list,
+    default=provinsi_list
+)
+
+df_plot = df_long[(df_long["tahun"]==tahun_sel) & (df_long["provinsi"].isin(selected_provinsi))]
+
+# =============================
+# SCATTER PLOT
+# =============================
+st.subheader(f"📈 Produksi vs Luas Lahan & Produktivitas ({tahun_sel})")
+fig = px.scatter(
+    df_plot,
+    x="luas_panen_ha",
+    y="produksi_ton",
+    size="produktivitaskuha",
+    color="status",
+    hover_data=["provinsi","produksi_prediksi","selisih","produktivitaskuha","luas_panen_ha"],
+    size_max=35,
+    color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
+)
+fig.update_layout(
+    xaxis_title="Luas Panen (ha)",
+    yaxis_title="Produksi (ton)",
+    legend_title="Status Produksi",
+    width=1200,
+    height=800
+)
+st.plotly_chart(fig, use_container_width=True)
+
+# =============================
+# TABEL PRODUKSI RENDAH
+# =============================
+st.subheader("Provinsi Produksi Rendah Dibanding Prediksi")
+st.dataframe(
+    df_plot[df_plot["status"]=="Rendah dari Prediksi"]
+    .sort_values("selisih")
+    .reset_index(drop=True)
+)

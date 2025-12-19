@@ -97,35 +97,60 @@ st.title("Analisis Produksi vs Luas Lahan & Produktivitas")
 # =============================
 # LOAD DATA
 # =============================
+import pandas as pd
+import streamlit as st
+import os
+
 @st.cache_data
-def load_data(csv_file="Produksi.csv"):
+def load_data(csv_file="produksi_wide.csv"):
+    """
+    Membaca CSV wide format, convert ke long format,
+    normalisasi kolom, dan pastikan tipe data numeric.
+    """
     BASE_DIR = os.path.dirname(__file__)
     csv_path = os.path.join(BASE_DIR, csv_file)
 
+    # --- Baca CSV ---
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
-        st.error(f"File not found: {csv_path}. Pastikan CSV ada di folder yang sama dengan app.py")
+        st.error(f"File not found: {csv_path}")
         st.stop()
 
-    # --- Normalisasi kolom ---
-    df.columns = df.columns.str.strip()           # hapus spasi di awal/akhir
-    df.columns = df.columns.str.replace(" ", "_") # ganti spasi dengan underscore
-    df.columns = df.columns.str.lower()           # ubah semua jadi lowercase
+    # --- Normalisasi nama kolom (hapus spasi, lowercase, ganti spasi dengan underscore) ---
+    df.columns = df.columns.str.strip().str.replace(" ", "_").str.lower()
+    
+    st.write("Kolom asli CSV setelah normalisasi:", df.columns.tolist())  # Optional: debug
 
-    # --- Cek kolom penting ---
-    required_cols = ["provinsi", "tahun", "Luas_Ha", "produktivitas", "produksi"]
-    for col in required_cols:
+    # --- Tentukan kolom yang tidak berubah antar tahun (id_vars) ---
+    id_vars = ["provinsi", "luas_lahan", "produktivitas"]  # pastikan kolom ini ada
+    for col in id_vars:
         if col not in df.columns:
             st.error(f"Column '{col}' tidak ditemukan di CSV")
             st.stop()
 
-    # --- Pastikan tipe data numeric ---
-    df["Luas_Ha"] = df["Luas_Ha"].astype(float)
-    df["produktivitas"] = df["produktivitas"].astype(float)
-    df["produksi"] = df["produksi"].astype(float)
+    # --- Kolom tahun adalah kolom selain id_vars ---
+    value_vars = [col for col in df.columns if col not in id_vars]
+    if len(value_vars) == 0:
+        st.error("Tidak ada kolom tahun ditemukan di CSV")
+        st.stop()
 
-    return df
+    # --- Melt wide → long ---
+    df_long = df.melt(
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name="tahun",
+        value_name="produksi"
+    )
+
+    # --- Pastikan tipe data ---
+    df_long["tahun"] = df_long["tahun"].astype(int)
+    df_long["produksi"] = pd.to_numeric(df_long["produksi"], errors="coerce")
+    df_long["luas_lahan"] = pd.to_numeric(df_long["luas_lahan"], errors="coerce")
+    df_long["produktivitas"] = pd.to_numeric(df_long["produktivitas"], errors="coerce")
+
+    return df_long
+
 
 df_long = load_data()
 

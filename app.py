@@ -123,7 +123,7 @@ def load_data(csv_file="Produksi.csv"):
     st.write("Kolom asli CSV setelah normalisasi:", df.columns.tolist())  # Optional: debug
 
     # --- Tentukan kolom yang tidak berubah antar tahun (id_vars) ---
-    id_vars = ["provinsi", "luas_panen_(ha)", "produktivitas"]  # pastikan kolom ini ada
+    id_vars = ["provinsi", "luas_panen_(ha)", "produktivitas_(ku/ha)"]  # pastikan kolom ini ada
     for col in id_vars:
         if col not in df.columns:
             st.error(f"Column '{col}' tidak ditemukan di CSV")
@@ -147,7 +147,7 @@ def load_data(csv_file="Produksi.csv"):
     df_long["tahun"] = df_long["tahun"].astype(int)
     df_long["produksi"] = pd.to_numeric(df_long["produksi"], errors="coerce")
     df_long["luas_panen_(ha)"] = pd.to_numeric(df_long["luas_panen_(ha)"], errors="coerce")
-    df_long["produktivitas"] = pd.to_numeric(df_long["produktivitas"], errors="coerce")
+    df_long["produktivitas_(ku/ha)"] = pd.to_numeric(df_long["produktivitas_(ku/ha)"], errors="coerce")
 
     return df_long
 
@@ -157,7 +157,7 @@ df_long = load_data()
 # =============================
 # LINEAR REGRESSION
 # =============================
-X = df_long[["Luas_Ha","produktivitas"]]
+X = df_long[["Luas_Ha","produktivitas_(ku/ha)"]]
 y = df_long["produksi"]
 model = LinearRegression()
 model.fit(X, y)
@@ -192,9 +192,9 @@ fig = px.scatter(
     df_plot,
     x="Luas_Ha",
     y="produksi",
-    size="produktivitas",
+    size="produktivitas_(ku/ha)",
     color="status",
-    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas","Luas_Ha"],
+    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas_(ku/ha)","Luas_Ha"],
     size_max=35,
     color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
 )

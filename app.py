@@ -102,7 +102,7 @@ import streamlit as st
 import os
 
 @st.cache_data
-def load_data(csv_file="produksi_wide.csv"):
+def load_data(csv_file="Produksi.csv"):
     """
     Membaca CSV wide format, convert ke long format,
     normalisasi kolom, dan pastikan tipe data numeric.

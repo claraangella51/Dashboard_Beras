@@ -17,38 +17,37 @@ st.set_page_config(
 st.title("📊 Dashboard Produksi & Gap Supply–Demand Beras Indonesia")
 
 # =============================
-# LOAD GAP DATA (HEATMAP)
+# LOAD GAP DATA
 # =============================
 @st.cache_data
 def load_gap_data():
     df = pd.read_csv("gap_per_provinsi.csv")
     gdf = gpd.read_file("indonesia.geojson")
 
-    # Normalisasi nama provinsi
     gdf["state"] = gdf["state"].str.upper().str.strip()
-
     return df, gdf
 
 gap_df, gdf = load_gap_data()
 
 # =============================
-# LOAD PRODUKSI DATA (wide → long)
+# LOAD PRODUKSI DATA (wide → long otomatis)
 # =============================
 @st.cache_data
 def load_produksi():
     df = pd.read_csv("Produksi.csv")  # ganti sesuai nama file
 
-    # Ambil list tahun dari header (deteksi otomatis atau manual)
+    # Asumsi struktur: 3 kolom per tahun setelah kolom Provinsi
     tahun = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
     dfs = []
-    for t in tahun:
-        # sesuaikan format header CSV
-        cols = [f"Luas Panen (ha)_{t}", f"Produktivitas (ku/ha)_{t}", f"Produksi (ton)_{t}"]
-        if all(c in df.columns for c in cols):
-            temp = df[["Provinsi"] + cols].copy()
-            temp.columns = ["provinsi", "luas_panen_ha", "produktivitaskuha", "produksi_ton"]
-            temp["tahun"] = t
-            dfs.append(temp)
+
+    for i, t in enumerate(tahun):
+        # kolom: 0 = Provinsi, lalu 3 kolom per tahun
+        start = 1 + i*3
+        temp = df.iloc[:, [0, start, start+1, start+2]].copy()
+        temp.columns = ["provinsi", "luas_panen_ha", "produktivitaskuha", "produksi_ton"]
+        temp["tahun"] = t
+        dfs.append(temp)
+
     df_long = pd.concat(dfs, ignore_index=True)
 
     # Normalisasi provinsi
@@ -76,30 +75,18 @@ year_gap = st.slider(
     step=1
 )
 
-# Transformasi gap CSV wide → long
-df_year = (
-    gap_df[gap_df["Tahun"] == year_gap]
-    .drop(columns="Tahun")
-    .T
-    .reset_index()
-)
+# Wide → Long gap CSV
+df_year = gap_df[gap_df["Tahun"] == year_gap].drop(columns="Tahun").T.reset_index()
 df_year.columns = ["state", "Gap_ton"]
 df_year["state"] = df_year["state"].str.upper().str.strip()
 
 # Merge ke GeoDataFrame
 gdf_merge = gdf.merge(df_year, on="state", how="left")
-
-# Debug merge
 st.write("Preview merge GeoDataFrame:")
 st.write(gdf_merge[["state", "Gap_ton"]].head(10))
 
 # Folium Map
-m = folium.Map(
-    location=[-2.5, 118],
-    zoom_start=5,
-    tiles="cartodbpositron"
-)
-
+m = folium.Map(location=[-2.5, 118], zoom_start=5, tiles="cartodbpositron")
 folium.Choropleth(
     geo_data=gdf_merge,
     data=gdf_merge,
@@ -128,83 +115,46 @@ st_folium(m, width=1400, height=700)
 # =============================
 X = df_long[["luas_panen_ha", "produktivitaskuha"]]
 y = df_long["produksi_ton"]
-
 model = LinearRegression()
 model.fit(X, y)
 
 df_long["produksi_prediksi"] = model.predict(X)
 df_long["selisih"] = df_long["produksi_ton"] - df_long["produksi_prediksi"]
-df_long["status"] = np.where(
-    df_long["selisih"] < 0,
-    "Rendah dari Prediksi",
-    "Sesuai / Di atas Prediksi"
-)
+df_long["status"] = np.where(df_long["selisih"] < 0, "Rendah dari Prediksi", "Sesuai / Di atas Prediksi")
 
 # =============================
 # SIDEBAR FILTER
 # =============================
 st.sidebar.subheader("Filter Data Produksi")
-
 tahun_sel = st.sidebar.slider(
     "Pilih Tahun",
     min_value=int(df_long["tahun"].min()),
     max_value=int(df_long["tahun"].max()),
     value=int(df_long["tahun"].min())
 )
-
 provinsi_list = sorted(df_long["provinsi"].unique())
-selected_provinsi = st.sidebar.multiselect(
-    "Pilih Provinsi",
-    options=provinsi_list,
-    default=provinsi_list
-)
-
-df_plot = df_long[
-    (df_long["tahun"] == tahun_sel) &
-    (df_long["provinsi"].isin(selected_provinsi))
-]
+selected_provinsi = st.sidebar.multiselect("Pilih Provinsi", options=provinsi_list, default=provinsi_list)
+df_plot = df_long[(df_long["tahun"] == tahun_sel) & (df_long["provinsi"].isin(selected_provinsi))]
 
 # =============================
 # SCATTER PLOT
 # =============================
 st.subheader(f"📈 Produksi vs Luas Panen & Produktivitas ({tahun_sel})")
-
 fig = px.scatter(
     df_plot,
     x="luas_panen_ha",
     y="produksi_ton",
     size="produktivitaskuha",
     color="status",
-    hover_data=[
-        "provinsi",
-        "produksi_prediksi",
-        "selisih",
-        "produktivitaskuha",
-        "luas_panen_ha"
-    ],
+    hover_data=["provinsi", "produksi_prediksi", "selisih", "produktivitaskuha", "luas_panen_ha"],
     size_max=35,
-    color_discrete_map={
-        "Rendah dari Prediksi": "red",
-        "Sesuai / Di atas Prediksi": "green"
-    }
+    color_discrete_map={"Rendah dari Prediksi": "red", "Sesuai / Di atas Prediksi": "green"}
 )
-
-fig.update_layout(
-    xaxis_title="Luas Panen (ha)",
-    yaxis_title="Produksi (ton)",
-    legend_title="Status Produksi",
-    height=750
-)
-
+fig.update_layout(xaxis_title="Luas Panen (ha)", yaxis_title="Produksi (ton)", legend_title="Status Produksi", height=750)
 st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # TABEL PROVINSI PRODUKSI RENDAH
 # =============================
 st.subheader("📉 Provinsi dengan Produksi di Bawah Prediksi")
-
-st.dataframe(
-    df_plot[df_plot["status"] == "Rendah dari Prediksi"]
-    .sort_values("selisih")
-    .reset_index(drop=True)
-)
+st.dataframe(df_plot[df_plot["status"] == "Rendah dari Prediksi"].sort_values("selisih").reset_index(drop=True))

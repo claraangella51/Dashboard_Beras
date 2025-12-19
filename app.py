@@ -102,7 +102,7 @@ import streamlit as st
 import os
 
 @st.cache_data
-def load_data(csv_file="Produksi.csv"):
+def load_data(csv_file="produksi_wide.csv"):
     """
     Membaca CSV wide format, convert ke long format,
     normalisasi kolom, dan pastikan tipe data numeric.
@@ -117,19 +117,25 @@ def load_data(csv_file="Produksi.csv"):
         st.error(f"File not found: {csv_path}")
         st.stop()
 
-    # --- Normalisasi nama kolom (hapus spasi, lowercase, ganti spasi dengan underscore) ---
-    df.columns = df.columns.str.strip().str.replace(" ", "_").str.lower()
-    
-    st.write("Kolom asli CSV setelah normalisasi:", df.columns.tolist())  # Optional: debug
+    # --- Normalisasi nama kolom ---
+    df.columns = (
+        df.columns
+        .str.strip()                     # hapus spasi depan/akhir
+        .str.replace(" ", "_")           # ganti spasi dengan underscore
+        .str.replace(r"[^\w]", "", regex=True)  # hapus karakter non-alphanumeric
+        .str.lower()                     # lowercase semua
+    )
 
-    # --- Tentukan kolom yang tidak berubah antar tahun (id_vars) ---
-    id_vars = ["provinsi", "luas_panen_(ha)", "produktivitas_(ku/ha)"]  # pastikan kolom ini ada
+    st.write("Kolom setelah normalisasi:", df.columns.tolist())  # opsional: debug
+
+    # --- Tentukan kolom tetap (id_vars) ---
+    id_vars = ["provinsi", "luas_lahan", "produktivitaskuha"]  # nama kolom sudah normalisasi
     for col in id_vars:
         if col not in df.columns:
             st.error(f"Column '{col}' tidak ditemukan di CSV")
             st.stop()
 
-    # --- Kolom tahun adalah kolom selain id_vars ---
+    # --- Kolom tahun adalah semua kolom selain id_vars ---
     value_vars = [col for col in df.columns if col not in id_vars]
     if len(value_vars) == 0:
         st.error("Tidak ada kolom tahun ditemukan di CSV")
@@ -143,11 +149,15 @@ def load_data(csv_file="Produksi.csv"):
         value_name="produksi"
     )
 
-    # --- Pastikan tipe data ---
-    df_long["tahun"] = df_long["tahun"].astype(int)
+    # --- Bersihkan kolom tahun ---
+    df_long["tahun"] = df_long["tahun"].astype(str).str.strip()         # hapus spasi
+    df_long["tahun"] = df_long["tahun"].str.extract(r"(\d{4})")         # ambil 4 digit tahun
+    df_long["tahun"] = pd.to_numeric(df_long["tahun"], errors="coerce") # konversi ke numeric
+
+    # --- Pastikan tipe data numeric ---
     df_long["produksi"] = pd.to_numeric(df_long["produksi"], errors="coerce")
-    df_long["luas_panen_(ha)"] = pd.to_numeric(df_long["luas_panen_(ha)"], errors="coerce")
-    df_long["produktivitas_(ku/ha)"] = pd.to_numeric(df_long["produktivitas_(ku/ha)"], errors="coerce")
+    df_long["luas_lahan"] = pd.to_numeric(df_long["luas_lahan"], errors="coerce")
+    df_long["produktivitaskuha"] = pd.to_numeric(df_long["produktivitaskuha"], errors="coerce")
 
     return df_long
 

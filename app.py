@@ -15,7 +15,7 @@ st.set_page_config(page_title="Dashboard Pangan Indonesia", layout="wide")
 st.title("📊 Dashboard Produksi & Gap Supply–Demand Beras Indonesia")
 
 # =============================
-# LOAD HEATMAP DATA
+# LOAD GAP DATA (HEATMAP)
 # =============================
 @st.cache_data
 def load_gap_data():
@@ -33,7 +33,6 @@ gap_df, gdf = load_gap_data()
 # HEATMAP
 # =============================
 st.subheader("🗺️ Heatmap Gap Supply–Demand Beras")
-
 year_gap = st.slider(
     "Pilih Tahun untuk Heatmap",
     min_value=int(gap_df["Tahun"].min()),
@@ -77,6 +76,7 @@ st_folium(m, width=1400, height=700)
 def load_produksi(csv_file="Produksi.csv"):
     BASE_DIR = os.path.dirname(__file__)
     csv_path = os.path.join(BASE_DIR, csv_file)
+
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
@@ -90,93 +90,7 @@ def load_produksi(csv_file="Produksi.csv"):
                   .str.replace(r"[^\w]", "", regex=True)
                   .str.lower()
     )
+
     st.write("Kolom setelah normalisasi:", df.columns.tolist())
 
-    if "provinsi" not in df.columns:
-        st.error("Kolom 'provinsi' tidak ditemukan")
-        st.stop()
-
-    # Melt wide → long
-    df_long = pd.wide_to_long(
-        df,
-        stubnames=["luas_panen_ha","produktivitaskuha","produksi_ton"],
-        i="provinsi",
-        j="tahun",
-        sep="",
-        suffix=r"\d+"
-    ).reset_index()
-
-    # Pastikan numeric
-    df_long["luas_panen_ha"] = pd.to_numeric(df_long["luas_panen_ha"], errors="coerce")
-    df_long["produktivitaskuha"] = pd.to_numeric(df_long["produktivitaskuha"], errors="coerce")
-    df_long["produksi_ton"] = pd.to_numeric(df_long["produksi_ton"], errors="coerce")
-    df_long["tahun"] = pd.to_numeric(df_long["tahun"], errors="coerce") + 2017  # suffix 1 = 2018
-
-    return df_long
-
-df_long = load_produksi()
-
-# =============================
-# LINEAR REGRESSION
-# =============================
-X = df_long[["luas_panen_ha","produktivitaskuha"]]
-y = df_long["produksi_ton"]
-model = LinearRegression()
-model.fit(X, y)
-
-df_long["produksi_prediksi"] = model.predict(X)
-df_long["selisih"] = df_long["produksi_ton"] - df_long["produksi_prediksi"]
-df_long["status"] = np.where(df_long["selisih"]<0,"Rendah dari Prediksi","Sesuai/Diatas Prediksi")
-
-# =============================
-# SIDEBAR: Tahun & Provinsi
-# =============================
-st.sidebar.subheader("Filter Data Produksi")
-tahun_sel = st.sidebar.slider(
-    "Pilih Tahun",
-    min_value=int(df_long["tahun"].min()),
-    max_value=int(df_long["tahun"].max()),
-    value=int(df_long["tahun"].min())
-)
-
-provinsi_list = df_long["provinsi"].unique().tolist()
-selected_provinsi = st.sidebar.multiselect(
-    "Pilih Provinsi",
-    options=provinsi_list,
-    default=provinsi_list
-)
-
-df_plot = df_long[(df_long["tahun"]==tahun_sel) & (df_long["provinsi"].isin(selected_provinsi))]
-
-# =============================
-# SCATTER PLOT
-# =============================
-st.subheader(f"📈 Produksi vs Luas Lahan & Produktivitas ({tahun_sel})")
-fig = px.scatter(
-    df_plot,
-    x="luas_panen_ha",
-    y="produksi_ton",
-    size="produktivitaskuha",
-    color="status",
-    hover_data=["provinsi","produksi_prediksi","selisih","produktivitaskuha","luas_panen_ha"],
-    size_max=35,
-    color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
-)
-fig.update_layout(
-    xaxis_title="Luas Panen (ha)",
-    yaxis_title="Produksi (ton)",
-    legend_title="Status Produksi",
-    width=1200,
-    height=800
-)
-st.plotly_chart(fig, use_container_width=True)
-
-# =============================
-# TABEL PRODUKSI RENDAH
-# =============================
-st.subheader("Provinsi Produksi Rendah Dibanding Prediksi")
-st.dataframe(
-    df_plot[df_plot["status"]=="Rendah dari Prediksi"]
-    .sort_values("selisih")
-    .reset_index(drop=True)
-)
+    if "provi

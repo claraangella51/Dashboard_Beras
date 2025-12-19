@@ -6,7 +6,6 @@ from streamlit_folium import st_folium
 import plotly.express as px
 from sklearn.linear_model import LinearRegression
 import numpy as np
-import os
 
 # =============================
 # PAGE CONFIG
@@ -30,8 +29,40 @@ def load_gap_data():
 
     return df, gdf
 
-
 gap_df, gdf = load_gap_data()
+
+# =====================================================
+# LOAD PRODUKSI DATA
+# =====================================================
+@st.cache_data
+def load_produksi():
+    df = pd.read_csv("produksi_rice.csv")  # sesuaikan path CSV kamu
+    df.columns = df.columns.str.strip()
+    return df
+
+df_long = load_produksi()  # Load dulu sebelum pakai
+
+# Standardisasi nama kolom utama
+rename_map = {}
+for col in df_long.columns:
+    col_lower = col.lower()
+    if "luas" in col_lower and "panen" in col_lower:
+        rename_map[col] = "luas_panen_ha"
+    elif "produksi" in col_lower:
+        rename_map[col] = "produksi_ton"
+    elif "produktif" in col_lower:
+        rename_map[col] = "produktivitaskuha"
+
+df_long = df_long.rename(columns=rename_map)
+
+# Cek kolom yang dibutuhkan
+required_cols = ["luas_panen_ha", "produktivitaskuha", "produksi_ton", "tahun", "provinsi"]
+missing_cols = [c for c in required_cols if c not in df_long.columns]
+if missing_cols:
+    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
+    st.stop()
+
+df_long = df_long.dropna(subset=required_cols)
 
 # =====================================================
 # HEATMAP PETA INDONESIA
@@ -88,34 +119,6 @@ folium.GeoJson(
 ).add_to(m)
 
 st_folium(m, width=1400, height=700)
-
-# =====================================================
-# LOAD PRODUKSI DATA
-# =====================================================
-# Standardisasi nama kolom utama jika ada
-rename_map = {}
-for col in df_long.columns:
-    col_lower = col.lower()
-    if "luas" in col_lower and "panen" in col_lower:
-        rename_map[col] = "luas_panen_ha"
-    elif "produksi" in col_lower:
-        rename_map[col] = "produksi_ton"
-    elif "produktif" in col_lower:
-        rename_map[col] = "produktivitaskuha"
-
-df_long = df_long.rename(columns=rename_map)
-
-# Cek kolom sebelum dropna
-required_cols = ["luas_panen_ha", "produktivitaskuha", "produksi_ton"]
-missing_cols = [c for c in required_cols if c not in df_long.columns]
-if missing_cols:
-    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
-    st.stop()
-
-df_long = df_long.dropna(subset=required_cols)
-
-
-df_long = load_produksi()
 
 # =====================================================
 # REGRESI LINIER

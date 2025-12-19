@@ -81,112 +81,95 @@ folium.GeoJson(
 # =============================
 st_folium(m, width=1400, height=700)
 
-# ================================
-# app.py
-# ================================
-
 import streamlit as st
 import pandas as pd
+import numpy as np
+import os
 import plotly.express as px
 from sklearn.linear_model import LinearRegression
-import numpy as np
 
+# =============================
+# PAGE CONFIG
+# =============================
 st.set_page_config(page_title="Produksi vs Luas & Produktivitas", layout="wide")
-
 st.title("Analisis Produksi vs Luas Lahan & Produktivitas")
 
-# -------------------------------
-# 1️⃣ Load Data
-# -------------------------------
+# =============================
+# LOAD DATA
+# =============================
 @st.cache_data
-def load_data():
-    df = pd.read_csv("produksi_long.csv")  
-    df["Luas_Ha"] = df["Luas_Ha"].astype(float)
-    df["Produktivitas"] = df["Produktivitas"].astype(float)
-    df["Produksi"] = df["Produksi"].astype(float)
-    return df
-
-df_long = load_data()
-import pandas as pd
-import streamlit as st
-import os
-
-def load_data():
+def load_data(csv_file="produksi_long.csv"):
     BASE_DIR = os.path.dirname(__file__)
-    csv_path = os.path.join(BASE_DIR, "produksi_long.csv")
+    csv_path = os.path.join(BASE_DIR, csv_file)
 
-    # --- Baca CSV dengan pengecekan file ---
     try:
         df = pd.read_csv(csv_path)
     except FileNotFoundError:
-        st.error(f"File not found: {csv_path}")
+        st.error(f"File not found: {csv_path}. Pastikan CSV ada di folder yang sama dengan app.py")
         st.stop()
 
-    # --- Normalisasi kolom supaya aman dari KeyError ---
-    df.columns = df.columns.str.strip()         # hapus spasi di depan/akhir
-    df.columns = df.columns.str.replace(" ", "_")  # ganti spasi dengan underscore
-    df.columns = df.columns.str.lower()         # ubah semua jadi lowercase
+    # --- Normalisasi kolom ---
+    df.columns = df.columns.str.strip()           # hapus spasi di awal/akhir
+    df.columns = df.columns.str.replace(" ", "_") # ganti spasi dengan underscore
+    df.columns = df.columns.str.lower()           # ubah semua jadi lowercase
 
-    st.write("Columns after normalization:", df.columns.tolist())  # optional: cek kolom
+    # --- Cek kolom penting ---
+    required_cols = ["provinsi", "tahun", "luas_ha", "produktivitas", "produksi"]
+    for col in required_cols:
+        if col not in df.columns:
+            st.error(f"Column '{col}' tidak ditemukan di CSV")
+            st.stop()
 
-    # --- Sekarang aman mengakses kolom ---
-    # contoh: ubah kolom luas_ha jadi float
-    if 'luas_ha' in df.columns:
-        df['luas_ha'] = df['luas_ha'].astype(float)
-    else:
-        st.error("'luas_ha' column not found in CSV")
-        st.stop()
+    # --- Pastikan tipe data numeric ---
+    df["luas_ha"] = df["luas_ha"].astype(float)
+    df["produktivitas"] = df["produktivitas"].astype(float)
+    df["produksi"] = df["produksi"].astype(float)
 
     return df
 
-# Panggil load_data() di main app
 df_long = load_data()
 
-
-# -------------------------------
-# 2️⃣ Prediksi Produksi (Linear Regression)
-# -------------------------------
-X = df_long[["Luas_Ha","Produktivitas"]]
-y = df_long["Produksi"]
-
+# =============================
+# LINEAR REGRESSION
+# =============================
+X = df_long[["luas_ha","produktivitas"]]
+y = df_long["produksi"]
 model = LinearRegression()
 model.fit(X, y)
 
-df_long["Produksi_prediksi"] = model.predict(X)
-df_long["Selisih"] = df_long["Produksi"] - df_long["Produksi_prediksi"]
+df_long["produksi_prediksi"] = model.predict(X)
+df_long["selisih"] = df_long["produksi"] - df_long["produksi_prediksi"]
+df_long["status"] = np.where(df_long["selisih"]<0,"Rendah dari Prediksi","Sesuai/Diatas Prediksi")
 
-# Tandai provinsi yang produksi rendah dibanding prediksi
-df_long["Status"] = np.where(df_long["Selisih"]<0, "Rendah dari Prediksi", "Sesuai/Diatas Prediksi")
-
-# -------------------------------
-# 3️⃣ Sidebar: Pilih Tahun & Provinsi
-# -------------------------------
+# =============================
+# SIDEBAR: Pilih Tahun & Provinsi
+# =============================
 tahun = st.sidebar.slider(
     "Pilih Tahun",
-    min_value=int(df_long["Tahun"].min()),
-    max_value=int(df_long["Tahun"].max()),
-    value=int(df_long["Tahun"].min())
+    min_value=int(df_long["tahun"].min()),
+    max_value=int(df_long["tahun"].max()),
+    value=int(df_long["tahun"].min())
 )
 
-provinsi_list = df_long["Provinsi"].unique().tolist()
+provinsi_list = df_long["provinsi"].unique().tolist()
 selected_provinsi = st.sidebar.multiselect(
     "Pilih Provinsi",
     options=provinsi_list,
-    default=provinsi_list  # default tampil semua
+    default=provinsi_list
 )
 
-df_plot = df_long[(df_long["Tahun"]==tahun) & (df_long["Provinsi"].isin(selected_provinsi))].copy()
+df_plot = df_long[(df_long["tahun"]==tahun) & (df_long["provinsi"].isin(selected_provinsi))]
 
-# -------------------------------
-# 4️⃣ Scatter Plot
-# -------------------------------
+# =============================
+# SCATTER PLOT
+# =============================
 fig = px.scatter(
     df_plot,
-    x="Luas_Ha",
-    y="Produksi",
-    size="Produktivitas",
-    color="Status",
-    hover_data=["Provinsi","Produksi_prediksi","Selisih","Produktivitas","Luas_Ha"],
+    x="luas_ha",
+    y="produksi",
+    size="produktivitas",
+    color="status",
+    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas","luas_ha"],
     size_max=35,
     color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
 )
@@ -202,13 +185,12 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# -------------------------------
-# 5️⃣ Tabel Provinsi Rendah Produksi
-# -------------------------------
+# =============================
+# TABEL PROVINSI PRODUKSI RENDAH
+# =============================
 st.subheader("Provinsi Produksi Rendah Dibanding Prediksi")
 st.dataframe(
-    df_plot[df_plot["Status"]=="Rendah dari Prediksi"]
-    .sort_values("Selisih")
+    df_plot[df_plot["status"]=="Rendah dari Prediksi"]
+    .sort_values("selisih")
     .reset_index(drop=True)
 )
-

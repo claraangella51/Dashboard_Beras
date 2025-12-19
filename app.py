@@ -96,7 +96,7 @@ st_folium(m, width=1400, height=700)
 def load_produksi(csv_file="Produksi.csv"):
     df = pd.read_csv(csv_file)
 
-    # Normalisasi kolom
+    # Normalisasi kolom: strip, lowercase, replace spasi & karakter aneh
     df.columns = (
         df.columns.str.strip()
                   .str.lower()
@@ -104,6 +104,7 @@ def load_produksi(csv_file="Produksi.csv"):
                   .str.replace(r"[^\w]", "", regex=True)
     )
 
+    # Pastikan kolom provinsi ada
     if "provinsi" not in df.columns:
         st.error("Kolom 'provinsi' tidak ditemukan di Produksi.csv")
         st.stop()
@@ -115,10 +116,8 @@ def load_produksi(csv_file="Produksi.csv"):
         value_name="nilai"
     )
 
-    # Ambil tahun (AMAN)
+    # Ambil tahun dari nama variabel
     df_long["tahun"] = df_long["variabel"].str.extract(r"(2018|2019|2020|2021|2022|2023)")
-
-    # 🔥 BUANG kolom TANPA tahun
     df_long = df_long.dropna(subset=["tahun"])
     df_long["tahun"] = df_long["tahun"].astype(int)
 
@@ -127,6 +126,8 @@ def load_produksi(csv_file="Produksi.csv"):
         df_long["variabel"]
         .str.replace(r"(2018|2019|2020|2021|2022|2023)", "", regex=True)
         .str.strip("_")
+        .str.replace(r"[^\w]", "", regex=True)  # pastikan clean
+        .str.lower()
     )
 
     # Pivot ke format rapi
@@ -141,13 +142,27 @@ def load_produksi(csv_file="Produksi.csv"):
         .reset_index()
     )
 
-    # Konversi numerik
+    # Standardisasi nama kolom utama untuk regresi
+    rename_map = {}
+    for col in df_long.columns:
+        if "luas" in col and "panen" in col:
+            rename_map[col] = "luas_panen_ha"
+        elif "produksi" in col:
+            rename_map[col] = "produksi_ton"
+        elif "produktif" in col:
+            rename_map[col] = "produktivitaskuha"
+
+    df_long = df_long.rename(columns=rename_map)
+
+    # Konversi numerik semua kolom kecuali provinsi & tahun
     for col in df_long.columns:
         if col not in ["provinsi", "tahun"]:
             df_long[col] = pd.to_numeric(df_long[col], errors="coerce")
 
-    return df_long
+    # Drop baris dengan NaN di kolom penting untuk regresi
+    df_long = df_long.dropna(subset=["luas_panen_ha", "produktivitaskuha", "produksi_ton"])
 
+    return df_long
 
 
 

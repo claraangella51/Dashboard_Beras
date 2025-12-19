@@ -36,7 +36,7 @@ gap_df, gdf = load_gap_data()
 # =====================================================
 @st.cache_data
 def load_produksi():
-    df = pd.read_csv("produksi_rice.csv")  # sesuaikan path CSV kamu
+    df = pd.read_csv("Produksi.csv")  # sesuaikan path CSV kamu
     df.columns = df.columns.str.strip()
     return df
 

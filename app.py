@@ -114,14 +114,14 @@ def load_data(csv_file="produksi_long.csv"):
     df.columns = df.columns.str.lower()           # ubah semua jadi lowercase
 
     # --- Cek kolom penting ---
-    required_cols = ["provinsi", "tahun", "luas_ha", "produktivitas", "produksi"]
+    required_cols = ["provinsi", "tahun", "Luas_Ha", "produktivitas", "produksi"]
     for col in required_cols:
         if col not in df.columns:
             st.error(f"Column '{col}' tidak ditemukan di CSV")
             st.stop()
 
     # --- Pastikan tipe data numeric ---
-    df["luas_ha"] = df["luas_ha"].astype(float)
+    df["Luas_Ha"] = df["Luas_Ha"].astype(float)
     df["produktivitas"] = df["produktivitas"].astype(float)
     df["produksi"] = df["produksi"].astype(float)
 
@@ -132,7 +132,7 @@ df_long = load_data()
 # =============================
 # LINEAR REGRESSION
 # =============================
-X = df_long[["luas_ha","produktivitas"]]
+X = df_long[["Luas_Ha","produktivitas"]]
 y = df_long["produksi"]
 model = LinearRegression()
 model.fit(X, y)
@@ -165,11 +165,11 @@ df_plot = df_long[(df_long["tahun"]==tahun) & (df_long["provinsi"].isin(selected
 # =============================
 fig = px.scatter(
     df_plot,
-    x="luas_ha",
+    x="Luas_Ha",
     y="produksi",
     size="produktivitas",
     color="status",
-    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas","luas_ha"],
+    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas","Luas_Ha"],
     size_max=35,
     color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
 )

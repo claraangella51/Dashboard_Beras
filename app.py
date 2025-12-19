@@ -16,9 +16,9 @@ st.set_page_config(
 )
 st.title("📊 Dashboard Produksi & Gap Supply–Demand Beras Indonesia")
 
-# =====================================================
+# =============================
 # LOAD GAP DATA (HEATMAP)
-# =====================================================
+# =============================
 @st.cache_data
 def load_gap_data():
     df = pd.read_csv("gap_per_provinsi.csv")
@@ -31,42 +31,41 @@ def load_gap_data():
 
 gap_df, gdf = load_gap_data()
 
-# =====================================================
-# LOAD PRODUKSI DATA
-# =====================================================
+# =============================
+# LOAD PRODUKSI DATA (wide → long)
+# =============================
 @st.cache_data
 def load_produksi():
-    df = pd.read_csv("Produksi.csv")  # sesuaikan path CSV kamu
-    df.columns = df.columns.str.strip()
-    return df
+    df = pd.read_csv("produksi_rice.csv")
 
-df_long = load_produksi()  # Load dulu sebelum pakai
+    # Ambil list tahun dari header (asumsi ada di header)
+    tahun = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+    dfs = []
+    for t in tahun:
+        cols = [f"Luas Panen (ha)_{t}", f"Produktivitas (ku/ha)_{t}", f"Produksi (ton)_{t}"]
+        # Jika header CSV tanpa _tahun, sesuaikan saja
+        if all(c in df.columns for c in cols):
+            temp = df[["Provinsi"] + cols].copy()
+            temp.columns = ["provinsi", "luas_panen_ha", "produktivitaskuha", "produksi_ton"]
+            temp["tahun"] = t
+            dfs.append(temp)
+    df_long = pd.concat(dfs, ignore_index=True)
 
-# Standardisasi nama kolom utama
-rename_map = {}
-for col in df_long.columns:
-    col_lower = col.lower()
-    if "luas" in col_lower and "panen" in col_lower:
-        rename_map[col] = "luas_panen_ha"
-    elif "produksi" in col_lower:
-        rename_map[col] = "produksi_ton"
-    elif "produktif" in col_lower:
-        rename_map[col] = "produktivitaskuha"
+    # Normalisasi provinsi
+    df_long["provinsi"] = df_long["provinsi"].str.upper().str.strip()
 
-df_long = df_long.rename(columns=rename_map)
+    # Pastikan numeric
+    df_long["luas_panen_ha"] = pd.to_numeric(df_long["luas_panen_ha"], errors="coerce")
+    df_long["produktivitaskuha"] = pd.to_numeric(df_long["produktivitaskuha"], errors="coerce")
+    df_long["produksi_ton"] = pd.to_numeric(df_long["produksi_ton"], errors="coerce")
 
-# Cek kolom yang dibutuhkan
-required_cols = ["luas_panen_ha", "produktivitaskuha", "produksi_ton", "tahun", "provinsi"]
-missing_cols = [c for c in required_cols if c not in df_long.columns]
-if missing_cols:
-    st.error(f"Kolom berikut tidak ditemukan: {missing_cols}")
-    st.stop()
+    return df_long.dropna(subset=["luas_panen_ha", "produktivitaskuha", "produksi_ton"])
 
-df_long = df_long.dropna(subset=required_cols)
+df_long = load_produksi()
 
-# =====================================================
+# =============================
 # HEATMAP PETA INDONESIA
-# =====================================================
+# =============================
 st.subheader("🗺️ Heatmap Gap Supply–Demand Beras")
 
 year_gap = st.slider(
@@ -120,9 +119,9 @@ folium.GeoJson(
 
 st_folium(m, width=1400, height=700)
 
-# =====================================================
+# =============================
 # REGRESI LINIER
-# =====================================================
+# =============================
 X = df_long[["luas_panen_ha", "produktivitaskuha"]]
 y = df_long["produksi_ton"]
 
@@ -137,9 +136,9 @@ df_long["status"] = np.where(
     "Sesuai / Di atas Prediksi"
 )
 
-# =====================================================
+# =============================
 # SIDEBAR FILTER
-# =====================================================
+# =============================
 st.sidebar.subheader("Filter Data Produksi")
 
 tahun_sel = st.sidebar.slider(
@@ -161,9 +160,9 @@ df_plot = df_long[
     (df_long["provinsi"].isin(selected_provinsi))
 ]
 
-# =====================================================
+# =============================
 # SCATTER PLOT
-# =====================================================
+# =============================
 st.subheader(f"📈 Produksi vs Luas Panen & Produktivitas ({tahun_sel})")
 
 fig = px.scatter(
@@ -195,9 +194,9 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# =====================================================
+# =============================
 # TABEL PROVINSI PRODUKSI RENDAH
-# =====================================================
+# =============================
 st.subheader("📉 Provinsi dengan Produksi di Bawah Prediksi")
 
 st.dataframe(

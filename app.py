@@ -102,7 +102,7 @@ import streamlit as st
 import os
 
 @st.cache_data
-def load_data(csv_file="produksi_wide.csv"):
+def load_data(csv_file="Produksi.csv"):
     """
     Membaca CSV wide format, convert ke long format,
     normalisasi kolom, dan pastikan tipe data numeric.
@@ -167,7 +167,7 @@ df_long = load_data()
 # =============================
 # LINEAR REGRESSION
 # =============================
-X = df_long[["Luas_Ha","produktivitas_(ku/ha)"]]
+X = df_long[["luas_lahan","produktivitaskuha"]]
 y = df_long["produksi"]
 model = LinearRegression()
 model.fit(X, y)
@@ -175,6 +175,7 @@ model.fit(X, y)
 df_long["produksi_prediksi"] = model.predict(X)
 df_long["selisih"] = df_long["produksi"] - df_long["produksi_prediksi"]
 df_long["status"] = np.where(df_long["selisih"]<0,"Rendah dari Prediksi","Sesuai/Diatas Prediksi")
+
 
 # =============================
 # SIDEBAR: Pilih Tahun & Provinsi
@@ -186,13 +187,6 @@ tahun = st.sidebar.slider(
     value=int(df_long["tahun"].min())
 )
 
-provinsi_list = df_long["provinsi"].unique().tolist()
-selected_provinsi = st.sidebar.multiselect(
-    "Pilih Provinsi",
-    options=provinsi_list,
-    default=provinsi_list
-)
-
 df_plot = df_long[(df_long["tahun"]==tahun) & (df_long["provinsi"].isin(selected_provinsi))]
 
 # =============================
@@ -200,25 +194,15 @@ df_plot = df_long[(df_long["tahun"]==tahun) & (df_long["provinsi"].isin(selected
 # =============================
 fig = px.scatter(
     df_plot,
-    x="Luas_Ha",
+    x="luas_lahan",
     y="produksi",
-    size="produktivitas_(ku/ha)",
+    size="produktivitaskuha",
     color="status",
-    hover_data=["provinsi","produksi_prediksi","selisih","produktivitas_(ku/ha)","Luas_Ha"],
+    hover_data=["provinsi","produksi_prediksi","selisih","produktivitaskuha","luas_lahan"],
     size_max=35,
     color_discrete_map={"Rendah dari Prediksi":"red","Sesuai/Diatas Prediksi":"green"}
 )
 
-fig.update_layout(
-    title=f"Produksi vs Luas Lahan & Produktivitas ({tahun})",
-    xaxis_title="Luas Panen (ha)",
-    yaxis_title="Produksi (ton)",
-    legend_title="Status Produksi",
-    width=1200,
-    height=800
-)
-
-st.plotly_chart(fig, use_container_width=True)
 
 # =============================
 # TABEL PROVINSI PRODUKSI RENDAH

@@ -36,14 +36,14 @@ gap_df, gdf = load_gap_data()
 # =============================
 @st.cache_data
 def load_produksi():
-    df = pd.read_csv("produksi_rice.csv")
+    df = pd.read_csv("Produksi.csv")  # ganti sesuai nama file
 
-    # Ambil list tahun dari header (asumsi ada di header)
+    # Ambil list tahun dari header (deteksi otomatis atau manual)
     tahun = [2018, 2019, 2020, 2021, 2022, 2023, 2024]
     dfs = []
     for t in tahun:
+        # sesuaikan format header CSV
         cols = [f"Luas Panen (ha)_{t}", f"Produktivitas (ku/ha)_{t}", f"Produksi (ton)_{t}"]
-        # Jika header CSV tanpa _tahun, sesuaikan saja
         if all(c in df.columns for c in cols):
             temp = df[["Provinsi"] + cols].copy()
             temp.columns = ["provinsi", "luas_panen_ha", "produktivitaskuha", "produksi_ton"]
@@ -76,7 +76,7 @@ year_gap = st.slider(
     step=1
 )
 
-# Wide → Long untuk tahun terpilih
+# Transformasi gap CSV wide → long
 df_year = (
     gap_df[gap_df["Tahun"] == year_gap]
     .drop(columns="Tahun")
@@ -86,8 +86,12 @@ df_year = (
 df_year.columns = ["state", "Gap_ton"]
 df_year["state"] = df_year["state"].str.upper().str.strip()
 
-# Merge ke peta
+# Merge ke GeoDataFrame
 gdf_merge = gdf.merge(df_year, on="state", how="left")
+
+# Debug merge
+st.write("Preview merge GeoDataFrame:")
+st.write(gdf_merge[["state", "Gap_ton"]].head(10))
 
 # Folium Map
 m = folium.Map(

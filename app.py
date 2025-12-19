@@ -96,7 +96,7 @@ st_folium(m, width=1400, height=700)
 def load_produksi(csv_file="Produksi.csv"):
     df = pd.read_csv(csv_file)
 
-    # Normalisasi kolom
+    # Normalisasi nama kolom
     df.columns = (
         df.columns.str.strip()
                   .str.lower()
@@ -105,28 +105,43 @@ def load_produksi(csv_file="Produksi.csv"):
     )
 
     if "provinsi" not in df.columns:
-        st.error("Kolom 'provinsi' tidak ditemukan")
+        st.error("Kolom 'provinsi' tidak ditemukan di Produksi.csv")
         st.stop()
 
-    # Wide → Long
-    df_long = pd.wide_to_long(
-        df,
-        stubnames=["luas_panen_ha", "produktivitaskuha", "produksi_ton"],
-        i="provinsi",
-        j="idx",
-        sep="",
-        suffix=r"\d+"
-    ).reset_index()
+    # Pisahkan kolom berdasarkan prefix
+    id_vars = ["provinsi"]
+    value_vars = [c for c in df.columns if c != "provinsi"]
 
-    # idx → tahun
-    df_long["tahun"] = df_long["idx"] + 2017
-    df_long.drop(columns="idx", inplace=True)
+    df_long = df.melt(
+        id_vars=id_vars,
+        value_vars=value_vars,
+        var_name="variabel",
+        value_name="nilai"
+    )
+
+    # Pisahkan nama variabel & tahun
+    df_long["tahun"] = df_long["variabel"].str.extract(r"(\d{4})").astype(int)
+    df_long["indikator"] = df_long["variabel"].str.replace(r"\d{4}", "", regex=True)
+
+    # Pivot balik → kolom rapi
+    df_long = (
+        df_long
+        .pivot_table(
+            index=["provinsi", "tahun"],
+            columns="indikator",
+            values="nilai",
+            aggfunc="first"
+        )
+        .reset_index()
+    )
 
     # Pastikan numeric
     for col in ["luas_panen_ha", "produktivitaskuha", "produksi_ton"]:
-        df_long[col] = pd.to_numeric(df_long[col], errors="coerce")
+        if col in df_long.columns:
+            df_long[col] = pd.to_numeric(df_long[col], errors="coerce")
 
     return df_long
+
 
 
 df_long = load_produksi()
